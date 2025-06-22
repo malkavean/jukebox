@@ -1,29 +1,11 @@
-<script>
-    // Supabase configuration
-    const SUPABASE_URL = 'https://wrcubaduypnqudrsaitj.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyY3ViYWR1eXBucXVkcnNhaXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1OTg3OTksImV4cCI6MjA2NjE3NDc5OX0.GYQeXfmsYssOFCiPcjdi1gub1lEUshTwlJ90EnyrlqY';
-
-    // Initialize Supabase client
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // Global variables
-    let currentRole = null;
-    let roomCode = null;
-    let roomId = null;
-    let queue = [];
-    let currentSongIndex = -1;
-    let player = null;
-    let isPlaying = false;
-    let userName = '';
-    let queueSubscription = null;
-    let roomSubscription = null;<!DOCTYPE html>
+    <!DOCTYPE html>
     <html lang="en">
         <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Party Jukebox - Collaborative Music Queue</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onload="console.log('QRCode library loaded')" onerror="console.log('QRCode library failed to load')"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2" onload="console.log('Supabase library loaded')" onerror="console.log('Supabase library failed to load')"></script>
 <style>
     * {
         margin: 0;
@@ -391,6 +373,48 @@
 </div>
 
 <script>
+    // Wait for Supabase to load before initializing
+    function initializeApp() {
+        if (typeof window.supabase === 'undefined') {
+            console.log('Waiting for Supabase to load...');
+            setTimeout(initializeApp, 100);
+            return;
+        }
+
+        console.log('Supabase loaded, initializing app...');
+
+        // Supabase configuration
+        const SUPABASE_URL = 'https://wrcubaduypnqudrsaitj.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyY3ViYWR1eXBucXVkcnNhaXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1OTg3OTksImV4cCI6MjA2NjE3NDc5OX0.GYQeXfmsYssOFCiPcjdi1gub1lEUshTwlJ90EnyrlqY';
+
+        // Initialize Supabase client
+        window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('Supabase client initialized');
+    }
+
+    // Start initialization when page loads
+    document.addEventListener('DOMContentLoaded', initializeApp);
+
+    // Supabase configuration
+    const SUPABASE_URL = 'https://wrcubaduypnqudrsaitj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyY3ViYWR1eXBucXVkcnNhaXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1OTg3OTksImV4cCI6MjA2NjE3NDc5OX0.GYQeXfmsYssOFCiPcjdi1gub1lEUshTwlJ90EnyrlqY';
+
+    // Initialize Supabase client (with fallback)
+    let supabase;
+    function getSupabase() {
+        if (!supabase) {
+            if (window.supabaseClient) {
+                supabase = window.supabaseClient;
+            } else if (window.supabase) {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            } else {
+                console.error('Supabase not loaded yet');
+                return null;
+            }
+        }
+        return supabase;
+    }
+
     // Global variables
     let currentRole = null;
     let roomCode = null;
@@ -446,8 +470,24 @@
         return storedUserData.name;
     }
 
+    // Generate a random room code
+    function generateRoomCode() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 6; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    }
+
     // Create or get room in Supabase
     async function createRoom() {
+        const supabase = getSupabase();
+        if (!supabase) {
+            showStatus('❌ Database connection not ready. Please wait and try again.');
+            return null;
+        }
+
         try {
             console.log('Creating room with code:', roomCode, 'for host:', userName);
 
@@ -487,6 +527,12 @@
 
     // Join existing room
     async function joinExistingRoom(code) {
+        const supabase = getSupabase();
+        if (!supabase) {
+            showStatus('❌ Database connection not ready. Please wait and try again.');
+            return null;
+        }
+
         try {
             console.log('Looking for room with code:', code);
 
