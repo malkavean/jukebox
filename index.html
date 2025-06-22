@@ -427,6 +427,9 @@
             <div style="text-align: center; margin-bottom: 10px; opacity: 0.8; font-size: 0.9rem;">
                 Adding as: <strong id="addingSongAs"></strong>
             </div>
+            <div style="text-align: center; margin-bottom: 15px; opacity: 0.7; font-size: 0.8rem;">
+                Room: <span id="currentRoomCode">Not connected</span>
+            </div>
             <input type="text" id="songSearch" class="song-input" placeholder="Search for a song or paste YouTube URL...">
             <button class="add-btn" onclick="addSong()">Add to Queue</button>
         </div>
@@ -1143,6 +1146,18 @@
 
     // Play next song
     async function playNextSong() {
+        // Safety check - only hosts can control playback
+        if (currentRole !== 'host') {
+            console.log('Only hosts can control playback');
+            return;
+        }
+
+        // Safety check - make sure we have a room
+        if (!roomId) {
+            console.log('No room available for playback');
+            return;
+        }
+
         if (queue.length === 0) {
             currentSongIndex = -1;
             document.getElementById('currentSongTitle').textContent = 'No songs in queue';
@@ -1218,6 +1233,11 @@
             const addingAsElement = document.getElementById('addingSongAs');
             if (addingAsElement) {
                 addingAsElement.textContent = userName;
+            }
+
+            const roomCodeElement = document.getElementById('currentRoomCode');
+            if (roomCodeElement) {
+                roomCodeElement.textContent = roomCode || 'Not connected';
             }
         }
 
