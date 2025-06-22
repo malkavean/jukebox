@@ -1,289 +1,308 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Party Jukebox - Collaborative Music Queue</title>
+<script>
+    // Supabase configuration
+    const SUPABASE_URL = 'https://wrcubaduypnqudrsaitj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyY3ViYWR1eXBucXVkcnNhaXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1OTg3OTksImV4cCI6MjA2NjE3NDc5OX0.GYQeXfmsYssOFCiPcjdi1gub1lEUshTwlJ90EnyrlqY';
+
+    // Initialize Supabase client
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Global variables
+    let currentRole = null;
+    let roomCode = null;
+    let roomId = null;
+    let queue = [];
+    let currentSongIndex = -1;
+    let player = null;
+    let isPlaying = false;
+    let userName = '';
+    let queueSubscription = null;
+    let roomSubscription = null;<!DOCTYPE html>
+    <html lang="en">
+        <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Party Jukebox - Collaborative Music Queue</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onload="console.log('QRCode library loaded')" onerror="console.log('QRCode library failed to load')"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #00f260 0%, #0575e6 50%, #667eea 100%);
-            min-height: 100vh;
-            color: white;
-        }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #00f260 0%, #0575e6 50%, #667eea 100%);
+        min-height: 100vh;
+        color: white;
+    }
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+    .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
 
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
+    .header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
 
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
+    .header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
 
-        .role-selector {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
+    .role-selector {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
 
-        .role-btn {
-            padding: 15px 30px;
-            font-size: 1.2rem;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
+    .role-btn {
+        padding: 15px 30px;
+        font-size: 1.2rem;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
 
-        .role-btn.host {
-            background: linear-gradient(45deg, #e74c3c, #c0392b);
-        }
+    .role-btn.host {
+        background: linear-gradient(45deg, #e74c3c, #c0392b);
+    }
 
-        .role-btn.guest {
-            background: linear-gradient(45deg, #00b894, #00cec9);
-        }
+    .role-btn.guest {
+        background: linear-gradient(45deg, #00b894, #00cec9);
+    }
 
-        .role-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-        }
+    .role-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
 
-        .section {
-            background: rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 25px;
-            margin-bottom: 25px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        }
+    .section {
+        background: rgba(255,255,255,0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 25px;
+        margin-bottom: 25px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
 
-        .room-setup {
-            text-align: center;
-        }
+    .room-setup {
+        text-align: center;
+    }
 
-        .room-code {
-            font-size: 2rem;
-            font-weight: bold;
-            background: rgba(255,255,255,0.2);
-            padding: 15px;
-            border-radius: 10px;
-            margin: 15px 0;
-            letter-spacing: 3px;
-        }
+    .room-code {
+        font-size: 2rem;
+        font-weight: bold;
+        background: rgba(255,255,255,0.2);
+        padding: 15px;
+        border-radius: 10px;
+        margin: 15px 0;
+        letter-spacing: 3px;
+    }
 
-        .qr-container {
-            margin: 20px 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+    .qr-container {
+        margin: 20px 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
 
-        #qrcode {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+    #qrcode {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
 
-        #qrcode canvas,
-        #qrcode table,
-        #qrcode img {
-            margin: 0 auto;
-            display: block;
-        }
+    #qrcode canvas,
+    #qrcode table,
+    #qrcode img {
+        margin: 0 auto;
+        display: block;
+    }
 
-        .player-section {
-            text-align: center;
-        }
+    .player-section {
+        text-align: center;
+    }
 
-        .current-song {
-            margin-bottom: 20px;
-        }
+    .current-song {
+        margin-bottom: 20px;
+    }
 
-        .song-title {
-            font-size: 1.5rem;
-            margin-bottom: 10px;
-        }
+    .song-title {
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+    }
 
-        .player-controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin: 20px 0;
-        }
+    .player-controls {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin: 20px 0;
+    }
 
-        .control-btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 25px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 1rem;
-        }
+    .control-btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 25px;
+        background: rgba(255,255,255,0.2);
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1rem;
+    }
 
-        .control-btn:hover {
-            background: rgba(255,255,255,0.3);
-            transform: translateY(-1px);
-        }
+    .control-btn:hover {
+        background: rgba(255,255,255,0.3);
+        transform: translateY(-1px);
+    }
 
-        .add-song-section {
-            margin-bottom: 25px;
-        }
+    .add-song-section {
+        margin-bottom: 25px;
+    }
 
-        .song-input {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 25px;
-            font-size: 1rem;
-            margin-bottom: 15px;
-            background: rgba(255,255,255,0.9);
-            color: #333;
-        }
+    .song-input {
+        width: 100%;
+        padding: 15px;
+        border: none;
+        border-radius: 25px;
+        font-size: 1rem;
+        margin-bottom: 15px;
+        background: rgba(255,255,255,0.9);
+        color: #333;
+    }
 
-        .add-btn {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 25px;
-            background: linear-gradient(45deg, #74b9ff, #0984e3);
-            color: white;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
+    .add-btn {
+        width: 100%;
+        padding: 15px;
+        border: none;
+        border-radius: 25px;
+        background: linear-gradient(45deg, #74b9ff, #0984e3);
+        color: white;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
 
-        .add-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-        }
+    .add-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    }
 
-        .queue-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
+    .queue-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
 
-        .queue-item {
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    .queue-item {
+        background: rgba(255,255,255,0.1);
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
 
-        .song-info {
-            flex: 1;
-        }
+    .song-info {
+        flex: 1;
+    }
 
-        .song-name {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
+    .song-name {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
 
-        .added-by {
-            font-size: 0.9rem;
-            opacity: 0.8;
-        }
+    .added-by {
+        font-size: 0.9rem;
+        opacity: 0.8;
+    }
 
-        .vote-section {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+    .vote-section {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
 
-        .vote-btn {
-            padding: 8px 12px;
-            border: none;
-            border-radius: 15px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-        }
+    .vote-btn {
+        padding: 8px 12px;
+        border: none;
+        border-radius: 15px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
 
-        .vote-up {
-            background: #55a3ff;
-            color: white;
-        }
+    .vote-up {
+        background: #55a3ff;
+        color: white;
+    }
 
-        .vote-down {
-            background: #fd79a8;
-            color: white;
-        }
+    .vote-down {
+        background: #fd79a8;
+        color: white;
+    }
 
-        .vote-count {
-            font-weight: bold;
-            min-width: 30px;
-            text-align: center;
-        }
+    .vote-count {
+        font-weight: bold;
+        min-width: 30px;
+        text-align: center;
+    }
 
-        .join-section {
-            text-align: center;
-        }
+    .join-section {
+        text-align: center;
+    }
 
-        .join-input {
-            padding: 15px;
-            border: none;
-            border-radius: 25px;
-            font-size: 1.2rem;
-            margin-right: 10px;
-            background: rgba(255,255,255,0.9);
-            color: #333;
-            width: 200px;
-            text-align: center;
-            letter-spacing: 2px;
-        }
+    .join-input {
+        padding: 15px;
+        border: none;
+        border-radius: 25px;
+        font-size: 1.2rem;
+        margin-right: 10px;
+        background: rgba(255,255,255,0.9);
+        color: #333;
+        width: 200px;
+        text-align: center;
+        letter-spacing: 2px;
+    }
 
-        .join-btn {
-            padding: 15px 30px;
-            border: none;
-            border-radius: 25px;
-            background: linear-gradient(45deg, #74b9ff, #0984e3);
-            color: white;
-            font-size: 1.2rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
+    .join-btn {
+        padding: 15px 30px;
+        border: none;
+        border-radius: 25px;
+        background: linear-gradient(45deg, #74b9ff, #0984e3);
+        color: white;
+        font-size: 1.2rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
 
-        .hidden {
-            display: none;
-        }
+    .hidden {
+        display: none;
+    }
 
-        .status {
-            text-align: center;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 10px;
-            background: rgba(255,255,255,0.1);
-        }
+    .status {
+        text-align: center;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.1);
+    }
 
-        #player {
-            width: 100%;
-            height: 315px;
-            border-radius: 15px;
-            margin: 20px 0;
-        }
-    </style>
+    #player {
+        width: 100%;
+        height: 315px;
+        border-radius: 15px;
+        margin: 20px 0;
+    }
+</style>
 </head>
 <body>
 <div class="container">
@@ -427,14 +446,263 @@
         return storedUserData.name;
     }
 
-    // Generate a random room code
-    function generateRoomCode() {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let result = '';
-        for (let i = 0; i < 6; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length));
+    // Create or get room in Supabase
+    async function createRoom() {
+        try {
+            console.log('Creating room with code:', roomCode, 'for host:', userName);
+
+            const { data, error } = await supabase
+                .from('rooms')
+                .insert([
+                    {
+                        code: roomCode,
+                        host_name: userName,
+                        current_song_index: -1
+                    }
+                ])
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Room creation error:', error);
+                showStatus('❌ Error creating room. Please try again.');
+                return null;
+            }
+
+            roomId = data.id;
+            console.log('Room created successfully:', data);
+            showStatus(`✅ Room ${roomCode} created! Room ID: ${roomId}`);
+
+            // Subscribe to room updates
+            subscribeToRoom();
+            subscribeToQueue();
+
+            return data;
+        } catch (error) {
+            console.error('Unexpected error creating room:', error);
+            showStatus('❌ Unexpected error creating room. Please try again.');
+            return null;
         }
-        return result;
+    }
+
+    // Join existing room
+    async function joinExistingRoom(code) {
+        try {
+            console.log('Looking for room with code:', code);
+
+            const { data, error } = await supabase
+                .from('rooms')
+                .select('*')
+                .eq('code', code)
+                .single();
+
+            if (error) {
+                console.error('Room lookup error:', error);
+                if (error.code === 'PGRST116') {
+                    showStatus('❌ Room not found. Please check the code.');
+                } else {
+                    showStatus('❌ Error connecting to room. Please try again.');
+                }
+                return null;
+            }
+
+            roomId = data.id;
+            roomCode = code;
+            currentSongIndex = data.current_song_index || -1;
+
+            console.log('Successfully joined room:', data);
+            showStatus(`✅ Connected to room hosted by ${data.host_name}`);
+
+            // Load existing queue
+            await loadQueue();
+
+            // Subscribe to updates
+            subscribeToRoom();
+            subscribeToQueue();
+
+            return data;
+        } catch (error) {
+            console.error('Unexpected error joining room:', error);
+            showStatus('❌ Unexpected error. Please try again.');
+            return null;
+        }
+    }
+
+    // Subscribe to room updates (for current song tracking)
+    function subscribeToRoom() {
+        roomSubscription = supabase
+            .channel('room-changes')
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'rooms',
+                filter: `id=eq.${roomId}`
+            }, (payload) => {
+                console.log('Room updated:', payload);
+                if (currentRole !== 'host') {
+                    currentSongIndex = payload.new.current_song_index;
+                    updateQueue();
+                }
+            })
+            .subscribe();
+    }
+
+    // Subscribe to queue updates
+    function subscribeToQueue() {
+        if (!roomId) {
+            console.error('Cannot subscribe to queue without roomId');
+            return;
+        }
+
+        console.log('Subscribing to queue updates for room:', roomId);
+
+        queueSubscription = supabase
+            .channel(`queue-${roomId}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'queue',
+                filter: `room_id=eq.${roomId}`
+            }, (payload) => {
+                console.log('Queue change received:', payload);
+                loadQueue();
+
+                if (payload.eventType === 'INSERT') {
+                    const newSong = payload.new;
+                    showStatus(`🎵 ${newSong.added_by} added "${newSong.title}"`);
+                }
+            })
+            .subscribe((status) => {
+                console.log('Queue subscription status:', status);
+            });
+    }
+
+    // Unsubscribe from real-time updates
+    function unsubscribeFromUpdates() {
+        if (queueSubscription) {
+            supabase.removeChannel(queueSubscription);
+            queueSubscription = null;
+        }
+        if (roomSubscription) {
+            supabase.removeChannel(roomSubscription);
+            roomSubscription = null;
+        }
+    }
+
+    // Load queue from Supabase
+    async function loadQueue() {
+        if (!roomId) {
+            console.error('No roomId available for loading queue');
+            return;
+        }
+
+        try {
+            console.log('Loading queue for room ID:', roomId);
+
+            const { data, error } = await supabase
+                .from('queue')
+                .select('*')
+                .eq('room_id', roomId)
+                .order('position');
+
+            if (error) {
+                console.error('Queue loading error:', error);
+                return;
+            }
+
+            console.log('Loaded queue data:', data);
+
+            queue = data.map(item => ({
+                id: item.id,
+                videoId: item.video_id,
+                title: item.title,
+                addedBy: item.added_by,
+                votes: item.votes || 0
+            }));
+
+            console.log('Processed queue:', queue);
+            updateQueue();
+
+            if (queue.length > 0) {
+                showStatus(`📋 Loaded ${queue.length} song${queue.length > 1 ? 's' : ''} from queue`);
+            }
+        } catch (error) {
+            console.error('Unexpected error loading queue:', error);
+        }
+    }
+
+    // Add song to Supabase
+    async function addSongToDatabase(videoId, title, addedBy) {
+        try {
+            const position = queue.length;
+
+            const { data, error } = await supabase
+                .from('queue')
+                .insert([
+                    {
+                        room_id: roomId,
+                        video_id: videoId,
+                        title: title,
+                        added_by: addedBy,
+                        votes: 0,
+                        position: position
+                    }
+                ])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            console.log('Song added to database:', data);
+            return data;
+        } catch (error) {
+            console.error('Error adding song:', error);
+            showStatus('❌ Error adding song. Please try again.');
+        }
+    }
+
+    // Update vote in Supabase
+    async function updateVoteInDatabase(songId, newVotes) {
+        try {
+            const { error } = await supabase
+                .from('queue')
+                .update({ votes: newVotes })
+                .eq('id', songId);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating vote:', error);
+        }
+    }
+
+    // Remove song from Supabase
+    async function removeSongFromDatabase(songId) {
+        try {
+            const { error } = await supabase
+                .from('queue')
+                .delete()
+                .eq('id', songId);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error removing song:', error);
+        }
+    }
+
+    // Update current song index in Supabase (host only)
+    async function updateCurrentSongIndex(index) {
+        if (currentRole === 'host' && roomId) {
+            try {
+                const { error } = await supabase
+                    .from('rooms')
+                    .update({ current_song_index: index })
+                    .eq('id', roomId);
+
+                if (error) throw error;
+            } catch (error) {
+                console.error('Error updating current song:', error);
+            }
+        }
     }
 
     // Set user role (host or guest)
@@ -744,47 +1012,39 @@
     }
 
     // Vote for a song
-    function vote(songId, direction) {
+    async function vote(songId, direction) {
         const songIndex = queue.findIndex(song => song.id === songId);
         if (songIndex !== -1) {
-            queue[songIndex].votes += direction;
+            const newVotes = queue[songIndex].votes + direction;
+            queue[songIndex].votes = newVotes;
 
-            // Sort queue by votes (except currently playing song)
-            if (currentSongIndex !== -1) {
-                const currentSong = queue[currentSongIndex];
-                const otherSongs = queue.filter((_, index) => index !== currentSongIndex);
-                otherSongs.sort((a, b) => b.votes - a.votes);
+            // Update vote in database
+            await updateVoteInDatabase(songId, newVotes);
 
-                queue = [currentSong, ...otherSongs];
-            } else {
-                queue.sort((a, b) => b.votes - a.votes);
-            }
-
+            // Update display immediately for better UX
             updateQueue();
         }
     }
 
     // Remove song from queue (host only)
-    function removeSong(songId) {
+    async function removeSong(songId) {
         const songIndex = queue.findIndex(song => song.id === songId);
         if (songIndex !== -1) {
             if (songIndex === currentSongIndex) {
                 nextSong();
             } else {
-                queue.splice(songIndex, 1);
-                if (songIndex < currentSongIndex) {
-                    currentSongIndex--;
-                }
-                updateQueue();
+                // Remove from database
+                await removeSongFromDatabase(songId);
             }
         }
     }
 
     // Play next song
-    function playNextSong() {
+    async function playNextSong() {
         if (queue.length === 0) {
             currentSongIndex = -1;
             document.getElementById('currentSongTitle').textContent = 'No songs in queue';
+            await updateCurrentSongIndex(-1);
             return;
         }
 
@@ -794,12 +1054,16 @@
         if (player && player.loadVideoById) {
             player.loadVideoById(song.videoId);
             document.getElementById('currentSongTitle').textContent = song.title;
+
+            // Update current song index in database (host only)
+            await updateCurrentSongIndex(currentSongIndex);
+
             updateQueue();
         }
     }
 
     // Player controls
-    function togglePlayPause() {
+    async function togglePlayPause() {
         if (player && player.getPlayerState) {
             if (isPlaying) {
                 player.pauseVideo();
@@ -809,14 +1073,14 @@
         }
     }
 
-    function nextSong() {
-        playNextSong();
+    async function nextSong() {
+        await playNextSong();
     }
 
-    function previousSong() {
+    async function previousSong() {
         if (currentSongIndex > 0) {
             currentSongIndex -= 2; // Will be incremented in playNextSong
-            playNextSong();
+            await playNextSong();
         }
     }
 
